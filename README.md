@@ -1006,4 +1006,4 @@ By using this software, you acknowledge that you have read, understood, and agre
 
 For the latest updates and releases, visit: [GitHub Repository](https://github.com/HirulaAbesignha/DR-detection)
 
-[Back to Top](#DiabeticRetinopathyDetectionSystem)
+[Back to Top](#diabeticretinopathydetectionsystem)

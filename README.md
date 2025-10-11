@@ -1,6 +1,10 @@
+<div align="center">
+
 # Diabetic Retinopathy Detection System
 
 Advanced deep learning system for automated detection and classification of diabetic retinopathy severity from retinal fundus images using transfer learning and computer vision techniques.
+
+</div>
 
 ## Table of Contents
 

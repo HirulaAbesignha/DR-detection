@@ -1,4 +1,4 @@
-# Diabetic Retinopathy Detection System
+# Diabetic Retinopathy Detection System - dev
 
 Advanced deep learning system for automated detection and classification of diabetic retinopathy severity from retinal fundus images using transfer learning and computer vision techniques.
 

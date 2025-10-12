@@ -13,17 +13,7 @@ from .utils import CONFIG
 
 
 def evaluate_model(model, test_generator, test_samples):
-    """
-    Evaluate model on test set.
-    
-    Args:
-        model: Trained Keras model
-        test_generator: Test data generator
-        test_samples: Test samples list
-        
-    Returns:
-        dict: Evaluation metrics
-    """
+    """Evaluate model on test set."""
     print("Evaluating model on test set...")
     
     # Get predictions
@@ -80,12 +70,7 @@ def evaluate_model(model, test_generator, test_samples):
 
 
 def plot_training_history(history):
-    """
-    Plot training history.
-    
-    Args:
-        history: Training history object
-    """
+    """Plot training history."""
     fig, axes = plt.subplots(2, 2, figsize=(15, 10))
     
     # Accuracy
@@ -116,30 +101,17 @@ def plot_training_history(history):
         axes[1, 0].legend()
         axes[1, 0].grid(True, alpha=0.3)
     
-    # Learning Rate
-    if 'lr' in history.history:
-        axes[1, 1].plot(history.history['lr'], linewidth=2, color='orange')
-        axes[1, 1].set_title('Learning Rate', fontsize=14, fontweight='bold')
+    # Precision/Recall
+    if 'precision' in history.history:
+        axes[1, 1].plot(history.history['precision'], label='Precision', linewidth=2)
+        axes[1, 1].plot(history.history['recall'], label='Recall', linewidth=2)
+        axes[1, 1].set_title('Precision & Recall', fontsize=14, fontweight='bold')
         axes[1, 1].set_xlabel('Epoch')
-        axes[1, 1].set_ylabel('Learning Rate')
-        axes[1, 1].set_yscale('log')
+        axes[1, 1].set_ylabel('Score')
+        axes[1, 1].legend()
         axes[1, 1].grid(True, alpha=0.3)
-    else:
-        # Plot precision/recall instead
-        if 'precision' in history.history:
-            axes[1, 1].plot(history.history['precision'], label='Precision', linewidth=2)
-            axes[1, 1].plot(history.history['recall'], label='Recall', linewidth=2)
-            axes[1, 1].set_title('Precision & Recall', fontsize=14, fontweight='bold')
-            axes[1, 1].set_xlabel('Epoch')
-            axes[1, 1].set_ylabel('Score')
-            axes[1, 1].legend()
-            axes[1, 1].grid(True, alpha=0.3)
     
     plt.tight_layout()
     plt.savefig('outputs/plots/training_history.png', dpi=300, bbox_inches='tight')
-    print("Training history plot saved to: outputs/plots/training_history.png")
+    print("✓ Training history plot saved to: outputs/plots/training_history.png")
     plt.close()
-
-
-if __name__ == "__main__":
-    print("Evaluation utilities module")

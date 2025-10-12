@@ -16,16 +16,7 @@ from .augmentation import apply_augmentation
 
 
 def load_dataset(data_path=None, sample_size=None):
-    """
-    Load diabetic retinopathy dataset.
-    
-    Args:
-        data_path: Path to local dataset (optional)
-        sample_size: Number of samples to load (optional)
-        
-    Returns:
-        List of samples with 'image', 'label', 'id' keys
-    """
+    """Load diabetic retinopathy dataset."""
     if sample_size is None:
         sample_size = CONFIG['SAMPLE_SIZE']
     
@@ -55,7 +46,7 @@ def load_dataset(data_path=None, sample_size=None):
             if (i + 1) % 100 == 0:
                 print(f"Loaded {i+1}/{sample_size} samples")
         
-        print(f"Dataset loaded: {len(samples)} samples")
+        print(f"✓ Dataset loaded: {len(samples)} samples")
         return samples
         
     except Exception as e:
@@ -65,24 +56,7 @@ def load_dataset(data_path=None, sample_size=None):
 
 
 def load_local_dataset(dataset_path, sample_size=None):
-    """
-    Load dataset from local folder structure.
-    
-    Expected structure:
-        dataset_path/
-            class_0/
-                image1.jpg
-                image2.jpg
-            class_1/
-            ...
-    
-    Args:
-        dataset_path: Path to dataset root
-        sample_size: Maximum samples per class
-        
-    Returns:
-        List of samples
-    """
+    """Load dataset from local folder structure."""
     samples = []
     samples_per_class = sample_size // 5 if sample_size else None
     
@@ -122,20 +96,12 @@ def load_local_dataset(dataset_path, sample_size=None):
                 print(f"Error loading {img_path}: {e}")
                 continue
     
-    print(f"Loaded {len(samples)} images from local storage")
+    print(f"✓ Loaded {len(samples)} images from local storage")
     return samples
 
 
 def create_simulated_dataset(sample_size=2000):
-    """
-    Create simulated retinal images for testing.
-    
-    Args:
-        sample_size: Total number of samples to create
-        
-    Returns:
-        List of simulated samples
-    """
+    """Create simulated retinal images for testing."""
     print("Creating simulated dataset...")
     np.random.seed(42)
     
@@ -171,20 +137,12 @@ def create_simulated_dataset(sample_size=2000):
             sample_id += 1
     
     np.random.shuffle(samples)
-    print(f"Created {len(samples)} simulated samples")
+    print(f"✓ Created {len(samples)} simulated samples")
     return samples
 
 
 def analyze_dataset(samples):
-    """
-    Analyze dataset statistics.
-    
-    Args:
-        samples: List of samples
-        
-    Returns:
-        dict: Dataset statistics
-    """
+    """Analyze dataset statistics."""
     labels = [s['label'] for s in samples]
     class_counts = Counter(labels)
     
@@ -199,20 +157,9 @@ def analyze_dataset(samples):
 
 
 class DRDataGenerator(keras.utils.Sequence):
-    """
-    Memory-efficient data generator for DR dataset.
-    """
+    """Memory-efficient data generator for DR dataset."""
     
     def __init__(self, samples, batch_size=None, shuffle=True, augment=False):
-        """
-        Initialize data generator.
-        
-        Args:
-            samples: List of samples
-            batch_size: Batch size (default: from CONFIG)
-            shuffle: Whether to shuffle data
-            augment: Whether to apply augmentation
-        """
         self.samples = samples
         self.batch_size = batch_size or CONFIG['BATCH_SIZE']
         self.shuffle = shuffle
@@ -221,19 +168,9 @@ class DRDataGenerator(keras.utils.Sequence):
         self.on_epoch_end()
     
     def __len__(self):
-        """Number of batches per epoch."""
         return int(np.ceil(len(self.samples) / self.batch_size))
     
     def __getitem__(self, idx):
-        """
-        Generate one batch of data.
-        
-        Args:
-            idx: Batch index
-            
-        Returns:
-            tuple: (X_batch, y_batch)
-        """
         batch_indices = self.indices[idx * self.batch_size:(idx + 1) * self.batch_size]
         batch_samples = [self.samples[i] for i in batch_indices]
         
@@ -241,15 +178,6 @@ class DRDataGenerator(keras.utils.Sequence):
         return X, y
     
     def _generate_batch(self, batch_samples):
-        """
-        Generate batch data.
-        
-        Args:
-            batch_samples: List of samples for this batch
-            
-        Returns:
-            tuple: (X, y) as numpy arrays
-        """
         X = np.zeros((len(batch_samples), CONFIG['IMG_SIZE'], CONFIG['IMG_SIZE'], 3), dtype=np.float32)
         y = np.zeros((len(batch_samples), 5), dtype=np.float32)
         
@@ -274,28 +202,18 @@ class DRDataGenerator(keras.utils.Sequence):
                 
             except Exception as e:
                 # Use zero image for failed samples
-                print(f"Error processing sample: {e}")
                 X[i] = np.zeros((CONFIG['IMG_SIZE'], CONFIG['IMG_SIZE'], 3))
                 y[i, 0] = 1.0
         
         return X, y
     
     def on_epoch_end(self):
-        """Shuffle indices after each epoch."""
         if self.shuffle:
             np.random.shuffle(self.indices)
 
 
 def calculate_class_weights(samples):
-    """
-    Calculate class weights for imbalanced dataset.
-    
-    Args:
-        samples: List of samples
-        
-    Returns:
-        dict: Class weights
-    """
+    """Calculate class weights for imbalanced dataset."""
     labels = [int(s['label']) for s in samples]
     class_counts = Counter(labels)
     
@@ -308,29 +226,3 @@ def calculate_class_weights(samples):
         class_weights[cls] = total / (num_classes * count)
     
     return class_weights
-
-
-if __name__ == "__main__":
-    # Test data loading
-    print("Testing data loader...")
-    
-    # Load dataset
-    samples = load_dataset(sample_size=100)
-    
-    # Analyze
-    stats = analyze_dataset(samples)
-    print("\nDataset Statistics:")
-    for key, value in stats.items():
-        print(f"  {key}: {value}")
-    
-    # Test generator
-    generator = DRDataGenerator(samples, batch_size=8, augment=True)
-    print(f"\nGenerator created: {len(generator)} batches")
-    
-    # Test batch
-    X_batch, y_batch = generator[0]
-    print(f"Batch shape: X={X_batch.shape}, y={y_batch.shape}")
-    
-    # Test class weights
-    weights = calculate_class_weights(samples)
-    print(f"\nClass weights: {weights}")

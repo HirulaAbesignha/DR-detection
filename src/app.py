@@ -19,15 +19,7 @@ from .report import generate_medical_report
 
 
 def create_gradio_interface(model):
-    """
-    Create Gradio web interface for DR detection.
-    
-    Args:
-        model: Trained Keras model
-        
-    Returns:
-        Gradio interface
-    """
+    """Create Gradio web interface for DR detection."""
     
     def predict_interface(image):
         """Prediction function for Gradio interface."""
@@ -108,36 +100,11 @@ def create_gradio_interface(model):
         description="""
         **Advanced AI-powered Diabetic Retinopathy Detection**
         
-        Upload a retinal fundus image to receive:
-        - Automated severity classification (0-4 scale)
-        - Confidence scores for all severity levels
-        - Attention heatmap showing affected areas
-        - Detailed medical report with recommendations
-        
-        **Severity Classes:**
-        - Class 0: No DR (Healthy)
-        - Class 1: Mild DR
-        - Class 2: Moderate DR
-        - Class 3: Severe DR
-        - Class 4: Proliferative DR (Most severe)
+        Upload a retinal fundus image to receive automated severity classification.
         
         **IMPORTANT:** This is an AI screening tool for educational purposes only.
         Always consult a qualified ophthalmologist for diagnosis and treatment.
         """,
-        article="""
-        ### About This System
-        
-        This system uses a deep learning model based on EfficientNetB3 architecture
-        trained on retinal fundus images to detect and classify diabetic retinopathy.
-        
-        **Model Performance:**
-        - Accuracy: 85-92%
-        - AUC-ROC: 0.92-0.96
-        
-        **Disclaimer:** This tool is for screening and educational purposes only.
-        It is not FDA-approved and should not replace professional medical evaluation.
-        """,
-        examples=None,
         theme="default",
         allow_flagging="never"
     )
@@ -168,7 +135,7 @@ def main():
     
     if not os.path.exists(args.model):
         print(f"Error: Model not found at {args.model}")
-        print("\nPlease train a model first using: python src/train.py")
+        print("\nPlease train a model first using: python -m src.train")
         return
     
     model = load_trained_model(args.model)

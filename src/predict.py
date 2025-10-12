@@ -17,17 +17,7 @@ from .report import generate_medical_report
 
 
 def predict_single_image(image, model, return_gradcam=False):
-    """
-    Predict diabetic retinopathy severity for a single image.
-    
-    Args:
-        image: Input image (path, PIL Image, or numpy array)
-        model: Trained Keras model
-        return_gradcam: Whether to generate Grad-CAM visualization
-        
-    Returns:
-        dict: Prediction results
-    """
+    """Predict diabetic retinopathy severity for a single image."""
     try:
         # Load and preprocess image
         if isinstance(image, str):
@@ -68,7 +58,6 @@ def predict_single_image(image, model, return_gradcam=False):
                 result['gradcam'] = gradcam_img
             except Exception as e:
                 print(f"Grad-CAM generation failed: {e}")
-                # Use resized original as fallback
                 result['gradcam'] = cv2.resize(original, (CONFIG['IMG_SIZE'], CONFIG['IMG_SIZE']))
         
         # Store processed image
@@ -82,18 +71,7 @@ def predict_single_image(image, model, return_gradcam=False):
 
 
 def batch_predict(image_folder, model, output_csv='predictions.csv', batch_size=16):
-    """
-    Predict on a batch of images from a folder.
-    
-    Args:
-        image_folder: Path to folder containing images
-        model: Trained Keras model
-        output_csv: Path to save CSV results
-        batch_size: Batch size for prediction
-        
-    Returns:
-        DataFrame with predictions
-    """
+    """Predict on a batch of images from a folder."""
     # Get all image files
     image_files = []
     for ext in ['*.jpg', '*.jpeg', '*.png', '*.JPG', '*.JPEG', '*.PNG']:
@@ -140,7 +118,7 @@ def batch_predict(image_folder, model, output_csv='predictions.csv', batch_size=
     
     # Save to CSV
     df.to_csv(output_csv, index=False)
-    print(f"\nPredictions saved to: {output_csv}")
+    print(f"\n✓ Predictions saved to: {output_csv}")
     
     # Print summary
     print("\nPrediction Summary:")
@@ -150,17 +128,7 @@ def batch_predict(image_folder, model, output_csv='predictions.csv', batch_size=
 
 
 def predict_with_report(image_path, model, save_visualization=None):
-    """
-    Predict and generate detailed medical report.
-    
-    Args:
-        image_path: Path to image
-        model: Trained model
-        save_visualization: Path to save visualization (optional)
-        
-    Returns:
-        tuple: (result dict, medical report string)
-    """
+    """Predict and generate detailed medical report."""
     # Make prediction
     result = predict_single_image(image_path, model, return_gradcam=True)
     
@@ -205,7 +173,7 @@ def predict_with_report(image_path, model, save_visualization=None):
         
         plt.tight_layout()
         plt.savefig(save_visualization, dpi=150, bbox_inches='tight')
-        print(f"Visualization saved to: {save_visualization}")
+        print(f"✓ Visualization saved to: {save_visualization}")
         plt.close()
     
     return result, report
@@ -226,8 +194,6 @@ def main():
                         help='Generate medical report')
     parser.add_argument('--save-visualization', type=str,
                         help='Path to save visualization image')
-    parser.add_argument('--batch-size', type=int, default=16,
-                        help='Batch size for folder prediction')
     
     args = parser.parse_args()
     
@@ -255,18 +221,16 @@ def main():
         # Save result
         import json
         with open(args.output, 'w') as f:
-            # Remove non-serializable items
             save_result = {k: v for k, v in result.items() 
                           if k not in ['original', 'gradcam']}
             json.dump(save_result, f, indent=2)
-        print(f"\nResult saved to: {args.output}")
+        print(f"\n✓ Result saved to: {args.output}")
     
     # Batch prediction
     elif args.folder:
         print(f"\nPredicting all images in: {args.folder}")
-        df = batch_predict(args.folder, model, output_csv=args.output, 
-                          batch_size=args.batch_size)
-        print(f"\nProcessed {len(df)} images")
+        df = batch_predict(args.folder, model, output_csv=args.output)
+        print(f"\n✓ Processed {len(df)} images")
     
     else:
         print("Error: Please specify --image or --folder")

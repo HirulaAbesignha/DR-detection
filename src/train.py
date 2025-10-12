@@ -19,21 +19,11 @@ from .visualization import plot_confusion_matrix, plot_roc_curves
 
 
 def get_callbacks(model_save_path, patience=None):
-    """
-    Get training callbacks.
-    
-    Args:
-        model_save_path: Path to save best model
-        patience: Early stopping patience
-        
-    Returns:
-        List of callbacks
-    """
+    """Get training callbacks."""
     if patience is None:
         patience = CONFIG['PATIENCE']
     
     callbacks_list = [
-        # Model checkpoint
         keras.callbacks.ModelCheckpoint(
             model_save_path,
             monitor='val_accuracy',
@@ -41,16 +31,12 @@ def get_callbacks(model_save_path, patience=None):
             mode='max',
             verbose=1
         ),
-        
-        # Early stopping
         keras.callbacks.EarlyStopping(
             monitor='val_loss',
             patience=patience,
             restore_best_weights=True,
             verbose=1
         ),
-        
-        # Reduce learning rate
         keras.callbacks.ReduceLROnPlateau(
             monitor='val_loss',
             factor=0.5,
@@ -58,14 +44,10 @@ def get_callbacks(model_save_path, patience=None):
             min_lr=1e-7,
             verbose=1
         ),
-        
-        # CSV logger
         keras.callbacks.CSVLogger(
             'outputs/logs/training_log.csv',
             append=False
         ),
-        
-        # Terminate on NaN
         keras.callbacks.TerminateOnNaN()
     ]
     
@@ -73,18 +55,7 @@ def get_callbacks(model_save_path, patience=None):
 
 
 def train_model(data_path=None, epochs=None, batch_size=None, learning_rate=None):
-    """
-    Complete training pipeline.
-    
-    Args:
-        data_path: Path to dataset
-        epochs: Number of epochs
-        batch_size: Batch size
-        learning_rate: Learning rate
-        
-    Returns:
-        tuple: (model, history, metrics)
-    """
+    """Complete training pipeline."""
     # Setup
     print("="*70)
     print("DIABETIC RETINOPATHY DETECTION - TRAINING PIPELINE")
@@ -105,12 +76,12 @@ def train_model(data_path=None, epochs=None, batch_size=None, learning_rate=None
     # Load dataset
     print("\n[1/8] Loading dataset...")
     samples = load_dataset(data_path=data_path, sample_size=CONFIG['SAMPLE_SIZE'])
-    print(f"Loaded {len(samples)} samples")
+    print(f"✓ Loaded {len(samples)} samples")
     
     # Analyze dataset
     stats = analyze_dataset(samples)
-    print(f"Class distribution: {stats['class_distribution']}")
-    print(f"Imbalance ratio: {stats['imbalance_ratio']:.2f}:1")
+    print(f"✓ Class distribution: {stats['class_distribution']}")
+    print(f"✓ Imbalance ratio: {stats['imbalance_ratio']:.2f}:1")
     
     # Split dataset
     print("\n[2/8] Splitting dataset...")
@@ -129,7 +100,7 @@ def train_model(data_path=None, epochs=None, batch_size=None, learning_rate=None
         random_state=42
     )
     
-    print(f"Train: {len(train_samples)} | Val: {len(val_samples)} | Test: {len(test_samples)}")
+    print(f"✓ Train: {len(train_samples)} | Val: {len(val_samples)} | Test: {len(test_samples)}")
     
     # Create data generators
     print("\n[3/8] Creating data generators...")
@@ -154,18 +125,18 @@ def train_model(data_path=None, epochs=None, batch_size=None, learning_rate=None
         augment=False
     )
     
-    print(f"Generators created: Train={len(train_gen)} batches, Val={len(val_gen)} batches")
+    print(f"✓ Generators created: Train={len(train_gen)} batches, Val={len(val_gen)} batches")
     
     # Calculate class weights
     class_weights = calculate_class_weights(train_samples)
-    print(f"Class weights: {class_weights}")
+    print(f"✓ Class weights: {class_weights}")
     
     # Create model
     print("\n[4/8] Building model...")
     model, base_model = create_dr_model()
     model = compile_model(model, learning_rate=CONFIG['LEARNING_RATE'])
     
-    print(f"Model created: {model.count_params():,} parameters")
+    print(f"✓ Model created: {model.count_params():,} parameters")
     print("\nModel architecture:")
     model.summary()
     
@@ -233,7 +204,6 @@ def train_model(data_path=None, epochs=None, batch_size=None, learning_rate=None
     
     # Save final model
     save_model(model, CONFIG['MODEL_SAVE_PATH'])
-    print(f"\nModel saved to: {CONFIG['MODEL_SAVE_PATH']}")
     
     memory_cleanup()
     
@@ -258,8 +228,6 @@ def main():
                         help='Learning rate')
     parser.add_argument('--sample-size', type=int, default=5000,
                         help='Number of samples to load')
-    parser.add_argument('--output-dir', type=str, default='./outputs',
-                        help='Output directory')
     
     args = parser.parse_args()
     
@@ -274,9 +242,8 @@ def main():
         learning_rate=args.learning_rate
     )
     
-    print("\nTraining completed successfully!")
-    print(f"Model saved to: {CONFIG['MODEL_SAVE_PATH']}")
-    print(f"Outputs saved to: {args.output_dir}")
+    print("\n✓ Training completed successfully!")
+    print(f"✓ Model saved to: {CONFIG['MODEL_SAVE_PATH']}")
 
 
 if __name__ == "__main__":

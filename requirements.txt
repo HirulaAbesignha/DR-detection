@@ -27,9 +27,3 @@ psutil>=5.9.0
 # Utilities
 pyyaml>=6.0
 tqdm>=4.65.0
-
-# Development (optional)
-pytest>=7.3.0
-pytest-cov>=4.1.0
-black>=23.3.0
-flake8>=6.0.0

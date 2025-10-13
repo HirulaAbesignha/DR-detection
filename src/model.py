@@ -5,57 +5,57 @@ Model architecture definitions for DR detection.
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers, models
-from tensorflow.keras.applications import EfficientNetB3
 
 from .utils import CONFIG
 
 
 def create_dr_model(num_classes=5, input_shape=None):
-    """
-    Create EfficientNetB3-based model for diabetic retinopathy detection.
-    """
+    """Create custom CNN model for diabetic retinopathy detection."""
     if input_shape is None:
         input_shape = (CONFIG['IMG_SIZE'], CONFIG['IMG_SIZE'], 3)
     
-    # Base model - EfficientNetB3
-    base_model = EfficientNetB3(
-        include_top=False,
-        weights='imagenet',
-        input_shape=input_shape,
-        pooling='avg'
-    )
-    
-    # Freeze base model initially
-    base_model.trainable = False
-    
-    # Build model
+    # Simple but effective CNN
     inputs = layers.Input(shape=input_shape, name='input_image')
-    x = base_model(inputs, training=False)
     
-    # Custom classification head
-    x = layers.Dense(512, activation='relu', name='dense_1')(x)
-    x = layers.BatchNormalization(name='bn_1')(x)
-    x = layers.Dropout(0.5, name='dropout_1')(x)
+    # Block 1
+    x = layers.Conv2D(32, (3, 3), activation='relu', padding='same')(inputs)
+    x = layers.BatchNormalization()(x)
+    x = layers.MaxPooling2D((2, 2))(x)
+    x = layers.Dropout(0.25)(x)
     
-    x = layers.Dense(256, activation='relu', name='dense_2')(x)
-    x = layers.BatchNormalization(name='bn_2')(x)
-    x = layers.Dropout(0.4, name='dropout_2')(x)
+    # Block 2
+    x = layers.Conv2D(64, (3, 3), activation='relu', padding='same')(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.MaxPooling2D((2, 2))(x)
+    x = layers.Dropout(0.25)(x)
     
-    x = layers.Dense(128, activation='relu', name='dense_3')(x)
-    x = layers.Dropout(0.3, name='dropout_3')(x)
+    # Block 3
+    x = layers.Conv2D(128, (3, 3), activation='relu', padding='same')(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.MaxPooling2D((2, 2))(x)
+    x = layers.Dropout(0.25)(x)
     
-    # Output layer
-    outputs = layers.Dense(
-        num_classes, 
-        activation='softmax', 
-        dtype='float32', 
-        name='predictions'
-    )(x)
+    # Block 4
+    x = layers.Conv2D(256, (3, 3), activation='relu', padding='same')(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.GlobalAveragePooling2D()(x)
+    x = layers.Dropout(0.5)(x)
     
-    # Create model
-    model = models.Model(inputs, outputs, name='DR_EfficientNetB3')
+    # Dense layers
+    x = layers.Dense(512, activation='relu')(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Dropout(0.5)(x)
     
-    return model, base_model
+    x = layers.Dense(256, activation='relu')(x)
+    x = layers.Dropout(0.4)(x)
+    
+    # Output
+    outputs = layers.Dense(num_classes, activation='softmax', dtype='float32')(x)
+    
+    model = models.Model(inputs, outputs, name='DR_CustomCNN')
+    
+    # Return model and None for base_model (to maintain compatibility)
+    return model, None
 
 
 def compile_model(model, learning_rate=None):
@@ -81,6 +81,10 @@ def compile_model(model, learning_rate=None):
 
 def unfreeze_base_model(base_model, num_layers_to_freeze=100):
     """Unfreeze base model for fine-tuning."""
+    # For custom CNN, just return as-is
+    if base_model is None:
+        return None
+    
     base_model.trainable = True
     
     # Freeze early layers

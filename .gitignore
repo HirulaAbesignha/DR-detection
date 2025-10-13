@@ -4,115 +4,36 @@ __pycache__/
 *$py.class
 *.so
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
 
 # Virtual Environment
 venv/
 env/
 ENV/
 .venv
-env.bak/
-venv.bak/
 
 # IDE
 .vscode/
 .idea/
 *.swp
-*.swo
-*~
 .DS_Store
-.project
-.pydevproject
-.settings/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-*.ipynb
 
 # Data
 data/retinal_images/
-data/*.csv
-data/*.zip
-data/*.tar.gz
 *.h5
 *.hdf5
 
 # Models
 models/*.h5
 models/*.pb
-models/saved_model/
-*.tflite
-*.onnx
 
 # Outputs
 outputs/plots/*.png
 outputs/logs/*.csv
-outputs/logs/*.txt
-outputs/predictions/*.csv
 temp_gradio_plot.png
 
 # Cache
 cache/
 .cache/
-*.pyc
-
-# TensorFlow
-*.ckpt
-*.ckpt.meta
-*.ckpt.index
-checkpoint
-events.out.tfevents.*
 
 # Logs
 *.log
-logs/
-tensorboard/
-
-# Temporary files
-temp/
-tmp/
-*.tmp
-temp_*
-
-# OS
-Thumbs.db
-.DS_Store
-desktop.ini
-
-# Large files
-*.zip
-*.tar.gz
-*.rar
-*.7z
-
-# Secrets
-.env
-secrets.yaml
-credentials.json
-*.key
-*.pem
-
-# Testing
-.coverage
-htmlcov/
-.pytest_cache/
-.tox/
-
-# Documentation builds
-docs/_build/
-site/

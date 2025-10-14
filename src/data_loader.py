@@ -24,6 +24,10 @@ def load_dataset(data_path=None, sample_size=None):
     if data_path and os.path.exists(data_path):
         print(f"Loading from local path: {data_path}")
         return load_local_dataset(data_path, sample_size)
+        
+    # Use simulated data by default (skip HuggingFace download)
+    print("Using simulated dataset (balanced across all classes)...")
+    return create_simulated_dataset(sample_size)
     
     # Try loading from HuggingFace
     try:
@@ -213,16 +217,61 @@ class DRDataGenerator(keras.utils.Sequence):
 
 
 def calculate_class_weights(samples):
-    """Calculate class weights for imbalanced dataset."""
+    """Calculate class weights for imbalanced dataset with stronger correction."""
     labels = [int(s['label']) for s in samples]
     class_counts = Counter(labels)
     
     total = len(labels)
     num_classes = 5
     
+    # Calculate base weights
     class_weights = {}
     for cls in range(num_classes):
         count = class_counts.get(cls, 1)
-        class_weights[cls] = total / (num_classes * count)
+        # Use square root to make weights more aggressive for minority classes
+        class_weights[cls] = (total / (num_classes * count)) ** 1.5
+    
+    # Further boost minority classes (3 and 4)
+    class_weights[3] = class_weights[3] * 3.0  # Severe
+    class_weights[4] = class_weights[4] * 3.0  # Proliferative
+    
+    print(f"Adjusted class weights: {class_weights}")
     
     return class_weights
+
+def balance_dataset(samples, max_samples_per_class=500):
+    """Balance dataset by limiting majority class samples."""
+    from collections import defaultdict
+    
+    # Group samples by class
+    class_samples = defaultdict(list)
+    for sample in samples:
+        class_samples[sample['label']].append(sample)
+    
+    # Print original distribution
+    print("\nOriginal distribution:")
+    for cls in range(5):
+        print(f"  Class {cls} ({CONFIG['CLASS_NAMES'][cls]}): {len(class_samples[cls])} samples")
+    
+    # Balance by limiting each class
+    balanced_samples = []
+    for cls in range(5):
+        samples_in_class = class_samples[cls]
+        
+        if len(samples_in_class) > max_samples_per_class:
+            # Undersample majority class
+            np.random.shuffle(samples_in_class)
+            samples_in_class = samples_in_class[:max_samples_per_class]
+        
+        balanced_samples.extend(samples_in_class)
+    
+    # Shuffle all samples
+    np.random.shuffle(balanced_samples)
+    
+    # Print balanced distribution
+    class_counts = Counter([s['label'] for s in balanced_samples])
+    print("\nBalanced distribution:")
+    for cls in range(5):
+        print(f"  Class {cls} ({CONFIG['CLASS_NAMES'][cls]}): {class_counts[cls]} samples")
+    
+    return balanced_samples

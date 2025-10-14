@@ -8,8 +8,8 @@ import numpy as np
 
 def apply_augmentation(image, label=None):
     """Apply data augmentation based on class."""
-    # Class-specific augmentation probabilities
-    aug_prob = {0: 0.2, 1: 0.4, 2: 0.6, 3: 0.8, 4: 0.8}
+    # More aggressive augmentation for minority classes
+    aug_prob = {0: 0.1, 1: 0.5, 2: 0.7, 3: 0.95, 4: 0.95}
     
     probability = aug_prob.get(label, 0.3) if label is not None else 0.5
     

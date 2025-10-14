@@ -58,16 +58,33 @@ def create_dr_model(num_classes=5, input_shape=None):
     return model, None
 
 
-def compile_model(model, learning_rate=None):
+def compile_model(model, learning_rate=None, use_focal_loss=False):
     """Compile model with optimizer and metrics."""
     if learning_rate is None:
         learning_rate = CONFIG['LEARNING_RATE']
     
     optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
     
+    # Choose loss function
+    if use_focal_loss:
+        import tensorflow.keras.backend as K
+        
+        def focal_loss(gamma=2.0, alpha=0.25):
+            def focal_loss_fixed(y_true, y_pred):
+                epsilon = K.epsilon()
+                y_pred = K.clip(y_pred, epsilon, 1. - epsilon)
+                cross_entropy = -y_true * K.log(y_pred)
+                loss = alpha * K.pow(1 - y_pred, gamma) * cross_entropy
+                return K.sum(loss, axis=-1)
+            return focal_loss_fixed
+        
+        loss_fn = focal_loss(gamma=2.0, alpha=0.25)
+    else:
+        loss_fn = 'categorical_crossentropy'
+    
     model.compile(
         optimizer=optimizer,
-        loss='categorical_crossentropy',
+        loss=loss_fn,
         metrics=[
             'accuracy',
             keras.metrics.AUC(name='auc'),

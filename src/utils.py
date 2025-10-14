@@ -14,7 +14,7 @@ CONFIG = {
     'BATCH_SIZE': 8,
     'EPOCHS': 50,
     'LEARNING_RATE': 1e-4,
-    'SAMPLE_SIZE': 5000,
+    'SAMPLE_SIZE': 2500,
     'PATIENCE': 10,
     'NUM_WORKERS': 4,
     'CLASS_NAMES': {

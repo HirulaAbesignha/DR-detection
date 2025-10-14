@@ -268,7 +268,7 @@ The model uses EfficientNetB3 as a feature extractor with custom classification 
 **Total Parameters:** Approximately 12 million trainable parameters
 
 **Training Strategy:**
-1. Stage 1: Train with frozen base model (10-20 epochs)
+1. Stage 1: Train with frozen base model (40-50 epochs)
 2. Stage 2: Fine-tune top layers of base model (10-20 epochs)
 
 ## Performance Metrics

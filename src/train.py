@@ -5,6 +5,24 @@ Training script for DR detection model.
 import os
 import argparse
 import numpy as np
+import tensorflow.keras.backend as K
+
+def focal_loss(gamma=2.0, alpha=0.25):
+    """
+    Focal loss for handling class imbalance.
+    Focuses learning on hard examples.
+    """
+    def focal_loss_fixed(y_true, y_pred):
+        epsilon = K.epsilon()
+        y_pred = K.clip(y_pred, epsilon, 1. - epsilon)
+        
+        cross_entropy = -y_true * K.log(y_pred)
+        loss = alpha * K.pow(1 - y_pred, gamma) * cross_entropy
+        
+        return K.sum(loss, axis=-1)
+    
+    return focal_loss_fixed
+
 from sklearn.model_selection import train_test_split
 from tensorflow import keras
 
@@ -80,12 +98,30 @@ def train_model(data_path=None, epochs=None, batch_size=None, learning_rate=None
     
     # Analyze dataset
     stats = analyze_dataset(samples)
-    print(f"✓ Class distribution: {stats['class_distribution']}")
-    print(f"✓ Imbalance ratio: {stats['imbalance_ratio']:.2f}:1")
+    print(f"✓ Original class distribution: {stats['class_distribution']}")
+    print(f"✓ Original imbalance ratio: {stats['imbalance_ratio']:.2f}:1")
     
-    # Split dataset
+    # ALWAYS balance dataset for severely imbalanced data
+    print("\n⚠ Balancing dataset to ensure all classes are represented...")
+    from .data_loader import balance_dataset
+    samples = balance_dataset(samples, max_samples_per_class=500)
+    
+    # Analyze balanced dataset
+    stats = analyze_dataset(samples)
+    print(f"✓ Balanced class distribution: {stats['class_distribution']}")
+    print(f"✓ Balanced imbalance ratio: {stats['imbalance_ratio']:.2f}:1")
+    
+    # Split dataset AFTER balancing (this ensures all classes in test set)
     print("\n[2/8] Splitting dataset...")
     labels = [s['label'] for s in samples]
+    
+    # Verify all classes are present
+    unique_labels = set(labels)
+    print(f"✓ Classes present in dataset: {sorted(unique_labels)}")
+    
+    if len(unique_labels) < 5:
+        print(f"⚠ WARNING: Only {len(unique_labels)} classes found! Expected 5.")
+        print("   The model may not learn to distinguish all DR severities.")
     
     train_samples, test_samples = train_test_split(
         samples, test_size=0.2,
@@ -134,7 +170,18 @@ def train_model(data_path=None, epochs=None, batch_size=None, learning_rate=None
     # Create model
     print("\n[4/8] Building model...")
     model, base_model = create_dr_model()
-    model = compile_model(model, learning_rate=CONFIG['LEARNING_RATE'])
+    # Use focal loss for imbalanced data
+    optimizer = keras.optimizers.Adam(learning_rate=CONFIG['LEARNING_RATE'])
+    model.compile(
+        optimizer=optimizer,
+        loss=focal_loss(gamma=2.0, alpha=0.25),
+        metrics=[
+            'accuracy',
+            keras.metrics.AUC(name='auc'),
+            keras.metrics.Precision(name='precision'),
+            keras.metrics.Recall(name='recall')
+        ]
+    )
     
     print(f"✓ Model created: {model.count_params():,} parameters")
     print("\nModel architecture:")
@@ -163,7 +210,7 @@ def train_model(data_path=None, epochs=None, batch_size=None, learning_rate=None
     base_model = unfreeze_base_model(base_model, num_layers_to_freeze=100)
     
     # Recompile with lower learning rate
-    model = compile_model(model, learning_rate=CONFIG['LEARNING_RATE'] / 10)
+    model = compile_model(model, learning_rate=CONFIG['LEARNING_RATE'] / 10, use_focal_loss=False)
     
     history2 = model.fit(
         train_gen,

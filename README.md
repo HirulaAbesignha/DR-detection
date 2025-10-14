@@ -1,6 +1,10 @@
-# Diabetic Retinopathy Detection System - dev
+<div align="center">
+
+# Diabetic Retinopathy Detection System
 
 Advanced deep learning system for automated detection and classification of diabetic retinopathy severity from retinal fundus images using transfer learning and computer vision techniques.
+
+</div>
 
 ## Table of Contents
 
@@ -264,7 +268,7 @@ The model uses EfficientNetB3 as a feature extractor with custom classification 
 **Total Parameters:** Approximately 12 million trainable parameters
 
 **Training Strategy:**
-1. Stage 1: Train with frozen base model (10-20 epochs)
+1. Stage 1: Train with frozen base model (40-50 epochs)
 2. Stage 2: Fine-tune top layers of base model (10-20 epochs)
 
 ## Performance Metrics
@@ -951,11 +955,6 @@ SOFTWARE.
 - Discussions: [GitHub Discussions](https://github.com/HirulaAbesignha/DR-detection/discussions)
 - Documentation: [Project Wiki](https://github.com/HirulaAbesignha/DR-detection/wiki)
 
-### Community
-- Join our Discord server for discussions and support
-- Follow development updates on Twitter
-- Subscribe to our mailing list for announcements
-
 ## Disclaimer
 
 **IMPORTANT MEDICAL DISCLAIMER**
@@ -1005,3 +1004,8 @@ By using this software, you acknowledge that you have read, understood, and agre
 **Maintained by:** Hirula Abesignha
 
 For the latest updates and releases, visit: [GitHub Repository](https://github.com/HirulaAbesignha/DR-detection)
+<div align="center">
+
+[Back to Top](#diabetic-retinopathy-detection-system)
+
+</div>

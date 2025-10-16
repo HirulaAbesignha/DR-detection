@@ -168,8 +168,11 @@ def train_model(data_path=None, epochs=None, batch_size=None, learning_rate=None
     print(f"✓ Class weights: {class_weights}")
     
     # Create model
+# Create model
     print("\n[4/8] Building model...")
     model, base_model = create_dr_model()
+    model = compile_model(model, learning_rate=CONFIG['LEARNING_RATE'], use_focal_loss=True)
+    print("✓ Using Focal Loss to handle class imbalance")
     # Use focal loss for imbalanced data
     optimizer = keras.optimizers.Adam(learning_rate=CONFIG['LEARNING_RATE'])
     model.compile(
@@ -204,27 +207,16 @@ def train_model(data_path=None, epochs=None, batch_size=None, learning_rate=None
     )
     
     memory_cleanup()
+    # Skip Stage 2 for simpler model (custom CNN doesn't need fine-tuning)
+    print("\n[6/8] Skipping fine-tuning (not needed for custom CNN)")
+    history2 = None
     
-    # Training Stage 2: Fine-tuning
-    print("\n[6/8] Training Stage 2 - Fine-tuning...")
-    base_model = unfreeze_base_model(base_model, num_layers_to_freeze=100)
+    memory_cleanup()
     
-    # Recompile with lower learning rate
-    model = compile_model(model, learning_rate=CONFIG['LEARNING_RATE'] / 10, use_focal_loss=False)
-    
-    history2 = model.fit(
-        train_gen,
-        validation_data=val_gen,
-        epochs=20,
-        callbacks=callbacks_list,
-        class_weight=class_weights,
-        verbose=1
-    )
-    
-    # Combine histories
-    for key in history1.history:
-        if key in history2.history:
-            history1.history[key].extend(history2.history[key])
+    # Combine histories (skipped since no stage 2)
+    # for key in history1.history:
+    #     if key in history2.history:
+    #         history1.history[key].extend(history2.history[key])
     
     memory_cleanup()
     

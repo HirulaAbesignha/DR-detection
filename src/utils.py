@@ -12,10 +12,10 @@ from tensorflow import keras
 CONFIG = {
     'IMG_SIZE': 224,
     'BATCH_SIZE': 8,
-    'EPOCHS': 50,
-    'LEARNING_RATE': 1e-4,
+    'EPOCHS': 100,
+    'LEARNING_RATE': 3e-4,
     'SAMPLE_SIZE': 2500,
-    'PATIENCE': 10,
+    'PATIENCE': 20,
     'NUM_WORKERS': 4,
     'CLASS_NAMES': {
         0: "No DR",

@@ -117,21 +117,41 @@ def create_simulated_dataset(sample_size=2000):
     for class_label, count in enumerate(class_distribution):
         for _ in range(count):
             # Create base image
-            img = np.random.randint(20, 200, (CONFIG['IMG_SIZE'], CONFIG['IMG_SIZE'], 3), dtype=np.uint8)
+            base_brightness = 100 + class_label * 20  # Different base per class
+            img = np.random.randint(base_brightness, base_brightness + 50, 
+                                   (CONFIG['IMG_SIZE'], CONFIG['IMG_SIZE'], 3), dtype=np.uint8)
             
-            # Add patterns based on severity
-            if class_label >= 3:  # Severe/Proliferative
-                for _ in range(np.random.randint(10, 20)):
-                    x, y = np.random.randint(20, CONFIG['IMG_SIZE']-20, 2)
-                    cv2.circle(img, (x, y), np.random.randint(2, 8), (0, 0, 255), -1)
-            elif class_label >= 2:  # Moderate
-                for _ in range(np.random.randint(5, 12)):
-                    x, y = np.random.randint(20, CONFIG['IMG_SIZE']-20, 2)
-                    cv2.circle(img, (x, y), np.random.randint(2, 5), (150, 0, 0), -1)
-            elif class_label >= 1:  # Mild
-                for _ in range(np.random.randint(2, 6)):
-                    x, y = np.random.randint(20, CONFIG['IMG_SIZE']-20, 2)
-                    cv2.circle(img, (x, y), np.random.randint(1, 3), (100, 0, 0), -1)
+            # Add VERY distinct patterns based on severity
+            if class_label == 0:  # No DR - clean image with slight texture
+                noise = np.random.randint(-5, 5, img.shape, dtype=np.int16)
+                img = np.clip(img.astype(np.int16) + noise, 0, 255).astype(np.uint8)
+                
+            elif class_label == 1:  # Mild - few small dots
+                for _ in range(5):
+                    x, y = np.random.randint(30, CONFIG['IMG_SIZE']-30, 2)
+                    cv2.circle(img, (x, y), 2, (100, 0, 0), -1)
+                    
+            elif class_label == 2:  # Moderate - more medium dots
+                for _ in range(12):
+                    x, y = np.random.randint(30, CONFIG['IMG_SIZE']-30, 2)
+                    cv2.circle(img, (x, y), 4, (150, 50, 0), -1)
+                    
+            elif class_label == 3:  # Severe - many large dots
+                for _ in range(20):
+                    x, y = np.random.randint(30, CONFIG['IMG_SIZE']-30, 2)
+                    cv2.circle(img, (x, y), 5, (200, 0, 0), -1)
+                    
+            elif class_label == 4:  # Proliferative - many large dots + lines
+                for _ in range(25):
+                    x, y = np.random.randint(30, CONFIG['IMG_SIZE']-30, 2)
+                    cv2.circle(img, (x, y), 6, (255, 0, 0), -1)
+                # Add lines to simulate neovascularization
+                for _ in range(8):
+                    pt1 = (np.random.randint(20, CONFIG['IMG_SIZE']-20), 
+                           np.random.randint(20, CONFIG['IMG_SIZE']-20))
+                    pt2 = (pt1[0] + np.random.randint(-40, 40), 
+                           pt1[1] + np.random.randint(-40, 40))
+                    cv2.line(img, pt1, pt2, (255, 0, 0), 3)
             
             samples.append({
                 'image': img,
@@ -141,7 +161,7 @@ def create_simulated_dataset(sample_size=2000):
             sample_id += 1
     
     np.random.shuffle(samples)
-    print(f"✓ Created {len(samples)} simulated samples")
+    print(f"✓ Created {len(samples)} simulated samples with distinct patterns per class")
     return samples
 
 
@@ -194,12 +214,14 @@ class DRDataGenerator(keras.utils.Sequence):
                 if img.shape[:2] != (CONFIG['IMG_SIZE'], CONFIG['IMG_SIZE']):
                     img = cv2.resize(img, (CONFIG['IMG_SIZE'], CONFIG['IMG_SIZE']))
                 
-                # Augmentation
-                if self.augment:
-                    img = apply_augmentation(img, label)
-                
-                # Preprocessing
+                # Preprocessing first
                 img = preprocess_image(img)
+                
+                # Augmentation after preprocessing (more effective)
+                if self.augment:
+                    # Apply augmentation to preprocessed image
+                    if np.random.random() < 0.5:
+                        img = np.fliplr(img)  # Flip horizontally
                 
                 X[i] = img
                 y[i, label] = 1.0

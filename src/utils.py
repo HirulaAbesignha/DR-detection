@@ -11,11 +11,11 @@ from tensorflow import keras
 # Global configuration
 CONFIG = {
     'IMG_SIZE': 224,
-    'BATCH_SIZE': 8,
-    'EPOCHS': 100,
-    'LEARNING_RATE': 3e-4,
-    'SAMPLE_SIZE': 2500,
-    'PATIENCE': 20,
+    'BATCH_SIZE': 16,
+    'EPOCHS': 50,
+    'LEARNING_RATE': 1e-4,
+    'SAMPLE_SIZE': 10000,
+    'PATIENCE': 15,
     'NUM_WORKERS': 4,
     'CLASS_NAMES': {
         0: "No DR",
@@ -90,11 +90,25 @@ def load_trained_model(model_path):
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"Model file not found: {model_path}")
     
+    # Define focal loss for loading
+    import tensorflow.keras.backend as K
+    
+    def focal_loss_fixed(y_true, y_pred):
+        gamma = 2.0
+        alpha = 0.25
+        epsilon = K.epsilon()
+        y_pred = K.clip(y_pred, epsilon, 1. - epsilon)
+        cross_entropy = -y_true * K.log(y_pred)
+        loss = alpha * K.pow(1 - y_pred, gamma) * cross_entropy
+        return K.sum(loss, axis=-1)
+    
     custom_objects = {
         'accuracy': keras.metrics.Accuracy,
         'auc': keras.metrics.AUC,
         'precision': keras.metrics.Precision,
-        'recall': keras.metrics.Recall
+        'recall': keras.metrics.Recall,
+        'focal_loss_fixed': focal_loss_fixed,  # Add focal loss
+        'loss': focal_loss_fixed  # Also register as 'loss'
     }
     
     try:

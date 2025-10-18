@@ -20,7 +20,8 @@ def normalize_image(image):
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
     elif image.shape[2] == 4:
         image = cv2.cvtColor(image, cv2.COLOR_RGBA2RGB)
-    
+
+
     # Apply CLAHE for contrast enhancement
     img_lab = cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
     clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
@@ -36,7 +37,6 @@ def normalize_image(image):
     img_norm = (img_norm - mean) / std
     
     return img_norm
-
 
 def preprocess_image(image, target_size=None):
     """Complete preprocessing pipeline for a single image."""

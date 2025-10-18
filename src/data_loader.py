@@ -23,40 +23,77 @@ def load_dataset(data_path=None, sample_size=None):
     # Check for local dataset first
     if data_path and os.path.exists(data_path):
         print(f"Loading from local path: {data_path}")
-        return load_local_dataset(data_path, sample_size)
         
-    # Use simulated data by default (skip HuggingFace download)
-    print("Using simulated dataset (balanced across all classes)...")
-    return create_simulated_dataset(sample_size)
+        return load_local_dataset(data_path, sample_size)
     
-    # Try loading from HuggingFace
+    # Try loading from HuggingFace  
+    print("Loading dataset from HuggingFace...")
     try:
-        print("Loading dataset from HuggingFace...")
         from datasets import load_dataset as hf_load_dataset
         
+        # Load entire dataset first
+        print("Downloading dataset (this may take a few minutes on first run)...")
         ds = hf_load_dataset(
-            "youssefedweqd/Diabetic_Retinopathy_Detection_preprocessed2",
-            streaming=True
-        )
+            "youssefedweqd/Diabetic_Retinopathy_Detection_preprocessed2"
+     )
+        print(f"Dataset info: {ds}")
         
-        samples = []
-        train_iter = iter(ds["train"])
+        # Try 'train' split
+        if 'train' in ds:
+            dataset = ds['train']
+        else:
+            # Use first available split
+            dataset = ds[list(ds.keys())[0]]
         
-        for i, sample in enumerate(train_iter):
-            if i >= sample_size:
-                break
-            samples.append(sample)
+        print(f"Using split with {len(dataset)} total samples")
+        
+        # Sample evenly from all classes
+        samples_by_class = {0: [], 1: [], 2: [], 3: [], 4: []}
+        
+        # First pass: collect all samples by class
+        print("Organizing samples by class...")
+        for i, sample in enumerate(dataset):
+            label = int(sample['label'])
+            if label in samples_by_class:
+                samples_by_class[label].append({
+                    'image': np.array(sample['image']),
+                    'label': label,
+                    'id': f'hf_{i}'
+                })
             
-            if (i + 1) % 100 == 0:
-                print(f"Loaded {i+1}/{sample_size} samples")
+            if (i + 1) % 1000 == 0:
+                print(f"Processed {i+1} samples...")
+                counts = {k: len(v) for k, v in samples_by_class.items()}
+                print(f"  Current distribution: {counts}")
         
-        print(f"✓ Dataset loaded: {len(samples)} samples")
+        # Report distribution
+        print(f"\nFull dataset distribution:")
+        for cls in range(5):
+            print(f"  Class {cls}: {len(samples_by_class[cls])} images")
+        
+        # Sample from each class proportionally
+        samples = []
+        samples_per_class = sample_size // 5
+        
+        for cls in range(5):
+            available = len(samples_by_class[cls])
+            take = min(available, samples_per_class)
+            
+            if take > 0:
+                np.random.shuffle(samples_by_class[cls])
+                samples.extend(samples_by_class[cls][:take])
+                print(f"  Taking {take} samples from class {cls}")
+        
+        np.random.shuffle(samples)
+        
+        print(f"\n✓ Dataset loaded: {len(samples)} samples from HuggingFace")
         return samples
         
     except Exception as e:
         print(f"Could not load from HuggingFace: {e}")
-        print("Creating simulated dataset...")
-        return create_simulated_dataset(sample_size)
+        import traceback
+        print(traceback.format_exc())
+        raise ValueError("No dataset found! Please provide --data-path with real images")
 
 
 def load_local_dataset(dataset_path, sample_size=None):
@@ -105,53 +142,68 @@ def load_local_dataset(dataset_path, sample_size=None):
 
 
 def create_simulated_dataset(sample_size=2000):
-    """Create simulated retinal images for testing."""
-    print("Creating simulated dataset...")
+    """Create EXTREMELY simple and distinct simulated images for easy learning."""
+    print("Creating super simple, highly distinct dataset for easy learning...")
     np.random.seed(42)
     
     samples = []
-    # Balanced distribution
     class_distribution = [sample_size // 5] * 5
     
     sample_id = 0
     for class_label, count in enumerate(class_distribution):
         for _ in range(count):
-            # Create base image
-            base_brightness = 100 + class_label * 20  # Different base per class
-            img = np.random.randint(base_brightness, base_brightness + 50, 
-                                   (CONFIG['IMG_SIZE'], CONFIG['IMG_SIZE'], 3), dtype=np.uint8)
+            # Create solid color background for each class (VERY DISTINCT)
+            img = np.zeros((CONFIG['IMG_SIZE'], CONFIG['IMG_SIZE'], 3), dtype=np.uint8)
             
-            # Add VERY distinct patterns based on severity
-            if class_label == 0:  # No DR - clean image with slight texture
-                noise = np.random.randint(-5, 5, img.shape, dtype=np.int16)
-                img = np.clip(img.astype(np.int16) + noise, 0, 255).astype(np.uint8)
+            if class_label == 0:  # No DR - Pure GREEN background
+                img[:, :, 1] = 200  # Green channel
+                # Add slight random texture
+                img = img + np.random.randint(0, 20, img.shape, dtype=np.uint8)
                 
-            elif class_label == 1:  # Mild - few small dots
-                for _ in range(5):
-                    x, y = np.random.randint(30, CONFIG['IMG_SIZE']-30, 2)
-                    cv2.circle(img, (x, y), 2, (100, 0, 0), -1)
+            elif class_label == 1:  # Mild - GREEN + 1 large RED circle center
+                img[:, :, 1] = 180  # Green background
+                img = img + np.random.randint(0, 15, img.shape, dtype=np.uint8)
+                # ONE large red circle in center
+                center = CONFIG['IMG_SIZE'] // 2
+                cv2.circle(img, (center, center), 40, (0, 0, 255), -1)
+                
+            elif class_label == 2:  # Moderate - GREEN + 4 RED circles (corners)
+                img[:, :, 1] = 160  # Green background
+                img = img + np.random.randint(0, 15, img.shape, dtype=np.uint8)
+                # Four red circles in corners
+                offset = 50
+                positions = [
+                    (offset, offset),
+                    (CONFIG['IMG_SIZE']-offset, offset),
+                    (offset, CONFIG['IMG_SIZE']-offset),
+                    (CONFIG['IMG_SIZE']-offset, CONFIG['IMG_SIZE']-offset)
+                ]
+                for pos in positions:
+                    cv2.circle(img, pos, 30, (0, 0, 255), -1)
                     
-            elif class_label == 2:  # Moderate - more medium dots
-                for _ in range(12):
-                    x, y = np.random.randint(30, CONFIG['IMG_SIZE']-30, 2)
-                    cv2.circle(img, (x, y), 4, (150, 50, 0), -1)
-                    
-            elif class_label == 3:  # Severe - many large dots
-                for _ in range(20):
-                    x, y = np.random.randint(30, CONFIG['IMG_SIZE']-30, 2)
-                    cv2.circle(img, (x, y), 5, (200, 0, 0), -1)
-                    
-            elif class_label == 4:  # Proliferative - many large dots + lines
-                for _ in range(25):
-                    x, y = np.random.randint(30, CONFIG['IMG_SIZE']-30, 2)
-                    cv2.circle(img, (x, y), 6, (255, 0, 0), -1)
-                # Add lines to simulate neovascularization
-                for _ in range(8):
-                    pt1 = (np.random.randint(20, CONFIG['IMG_SIZE']-20), 
-                           np.random.randint(20, CONFIG['IMG_SIZE']-20))
-                    pt2 = (pt1[0] + np.random.randint(-40, 40), 
-                           pt1[1] + np.random.randint(-40, 40))
-                    cv2.line(img, pt1, pt2, (255, 0, 0), 3)
+            elif class_label == 3:  # Severe - GREEN + RED grid pattern
+                img[:, :, 1] = 140  # Green background
+                img = img + np.random.randint(0, 15, img.shape, dtype=np.uint8)
+                # Grid of 9 red circles (3x3)
+                for i in range(3):
+                    for j in range(3):
+                        x = (i + 1) * CONFIG['IMG_SIZE'] // 4
+                        y = (j + 1) * CONFIG['IMG_SIZE'] // 4
+                        cv2.circle(img, (x, y), 25, (0, 0, 255), -1)
+                        
+            elif class_label == 4:  # Proliferative - GREEN + RED circles + WHITE lines
+                img[:, :, 1] = 120  # Dark green background
+                img = img + np.random.randint(0, 15, img.shape, dtype=np.uint8)
+                # Many red circles (random)
+                for _ in range(15):
+                    x = np.random.randint(40, CONFIG['IMG_SIZE']-40)
+                    y = np.random.randint(40, CONFIG['IMG_SIZE']-40)
+                    cv2.circle(img, (x, y), 20, (0, 0, 255), -1)
+                # White crossing lines (X pattern)
+                cv2.line(img, (0, 0), (CONFIG['IMG_SIZE'], CONFIG['IMG_SIZE']), 
+                        (255, 255, 255), 5)
+                cv2.line(img, (CONFIG['IMG_SIZE'], 0), (0, CONFIG['IMG_SIZE']), 
+                        (255, 255, 255), 5)
             
             samples.append({
                 'image': img,
@@ -161,9 +213,17 @@ def create_simulated_dataset(sample_size=2000):
             sample_id += 1
     
     np.random.shuffle(samples)
-    print(f"✓ Created {len(samples)} simulated samples with distinct patterns per class")
+    print(f"✓ Created {len(samples)} SUPER SIMPLE samples (should reach 80-90% accuracy)")
+    print("   Class 0: Green only")
+    print("   Class 1: Green + 1 red circle center")
+    print("   Class 2: Green + 4 red circles corners")
+    print("   Class 3: Green + 3x3 red grid")
+    print("   Class 4: Green + many red circles + white X")
     return samples
-
+    
+    np.random.shuffle(samples)
+    print(f"✓ Created {len(samples)} samples with highly distinct visual patterns")
+    return samples
 
 def analyze_dataset(samples):
     """Analyze dataset statistics."""
@@ -261,7 +321,7 @@ def calculate_class_weights(samples):
     
     return class_weights
 
-def balance_dataset(samples, max_samples_per_class=500):
+def balance_dataset(samples, max_samples_per_class=2000):
     """Balance dataset by limiting majority class samples."""
     from collections import defaultdict
     

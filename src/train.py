@@ -104,7 +104,7 @@ def train_model(data_path=None, epochs=None, batch_size=None, learning_rate=None
     # ALWAYS balance dataset for severely imbalanced data
     print("\n⚠ Balancing dataset to ensure all classes are represented...")
     from .data_loader import balance_dataset
-    samples = balance_dataset(samples, max_samples_per_class=500)
+    samples = balance_dataset(samples, max_samples_per_class=2000)
     
     # Analyze balanced dataset
     stats = analyze_dataset(samples)
@@ -171,8 +171,9 @@ def train_model(data_path=None, epochs=None, batch_size=None, learning_rate=None
 # Create model
     print("\n[4/8] Building model...")
     model, base_model = create_dr_model()
-    model = compile_model(model, learning_rate=CONFIG['LEARNING_RATE'], use_focal_loss=True)
-    print("✓ Using Focal Loss to handle class imbalance")
+    model = compile_model(model, learning_rate=CONFIG['LEARNING_RATE'], use_focal_loss=False)
+    print("✓ Using standard categorical cross-entropy loss")
+
     # Use focal loss for imbalanced data
     optimizer = keras.optimizers.Adam(learning_rate=CONFIG['LEARNING_RATE'])
     model.compile(

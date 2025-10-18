@@ -20,6 +20,16 @@ def normalize_image(image):
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
     elif image.shape[2] == 4:
         image = cv2.cvtColor(image, cv2.COLOR_RGBA2RGB)
+    
+    # ADD THIS: Ensure exactly 3 channels
+    if len(image.shape) != 3 or image.shape[2] != 3:
+        print(f"Warning: Unexpected image shape {image.shape}, converting to RGB")
+        if len(image.shape) == 2:
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+        elif image.shape[2] == 1:
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+        elif image.shape[2] > 3:
+            image = image[:, :, :3]  # Take first 3 channels
 
 
     # Apply CLAHE for contrast enhancement

@@ -206,18 +206,65 @@ def train_model(data_path=None, epochs=None, batch_size=None, learning_rate=None
         class_weight=class_weights,
         verbose=1
     )
-    
     memory_cleanup()
-    # Skip Stage 2 for simpler model (custom CNN doesn't need fine-tuning)
-    print("\n[6/8] Skipping fine-tuning (not needed for custom CNN)")
-    history2 = None
-    
-    memory_cleanup()
-    
-    # Combine histories (skipped since no stage 2)
-    # for key in history1.history:
-    #     if key in history2.history:
-    #         history1.history[key].extend(history2.history[key])
+
+    # Training Stage 2: Fine-tuning (unfreeze base model)
+    if base_model is not None:
+        print("\n[6/8] Training Stage 2 - Fine-tuning base model...")
+        
+        # Unfreeze base model
+        base_model.trainable = True
+        
+        # Freeze first 100 layers (keep low-level features)
+        for layer in base_model.layers[:100]:
+            layer.trainable = False
+        
+        trainable_layers = sum([1 for layer in base_model.layers if layer.trainable])
+        print(f"✅ Unfrozen {trainable_layers} layers for fine-tuning")
+        
+        # Recompile with LOWER learning rate (critical for fine-tuning)
+        fine_tune_lr = CONFIG['LEARNING_RATE'] / 10
+        print(f"Using fine-tuning learning rate: {fine_tune_lr}")
+        
+        optimizer = keras.optimizers.Adam(learning_rate=fine_tune_lr)
+        model.compile(
+            optimizer=optimizer,
+            loss=focal_loss(gamma=2.0, alpha=0.25),
+            metrics=[
+                'accuracy',
+                keras.metrics.AUC(name='auc'),
+                keras.metrics.Precision(name='precision'),
+                keras.metrics.Recall(name='recall')
+            ]
+        )
+        
+        # Reset callbacks for stage 2
+        callbacks_list = get_callbacks(CONFIG['MODEL_SAVE_PATH'], patience=CONFIG['PATIENCE'])
+        
+        # Fine-tune for fewer epochs
+        fine_tune_epochs = 20
+        print(f"Fine-tuning for {fine_tune_epochs} epochs...")
+        
+        history2 = model.fit(
+            train_gen,
+            validation_data=val_gen,
+            epochs=fine_tune_epochs,
+            callbacks=callbacks_list,
+            class_weight=class_weights,
+            verbose=1,
+            initial_epoch=len(history1.history['loss'])
+        )
+        
+        # Combine training histories
+        print("Merging training histories...")
+        for key in history1.history:
+            if key in history2.history:
+                history1.history[key].extend(history2.history[key])
+        
+        print("✅ Fine-tuning complete!")
+    else:
+        print("\n[6/8] Skipping fine-tuning (no base model available)")
+        history2 = None
     
     memory_cleanup()
     

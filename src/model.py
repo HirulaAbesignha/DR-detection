@@ -10,52 +10,50 @@ from .utils import CONFIG
 
 
 def create_dr_model(num_classes=5, input_shape=None):
-    """Create custom CNN model for diabetic retinopathy detection."""
+    """Create EfficientNetB3 model with transfer learning for DR detection."""
     if input_shape is None:
         input_shape = (CONFIG['IMG_SIZE'], CONFIG['IMG_SIZE'], 3)
     
-    # Simple but effective CNN
+    # Use EfficientNetB3 pretrained on ImageNet
+    print("Loading EfficientNetB3 with ImageNet weights...")
+    base_model = keras.applications.EfficientNetB3(
+        include_top=False,
+        weights='imagenet',  # CRITICAL: Pretrained weights
+        input_shape=input_shape,
+        pooling='avg'
+    )
+    
+    # Freeze base model initially (will unfreeze later for fine-tuning)
+    base_model.trainable = False
+    print(f"Base model frozen: {len(base_model.layers)} layers")
+    
+    # Build full model
     inputs = layers.Input(shape=input_shape, name='input_image')
     
-    # Block 1
-    x = layers.Conv2D(32, (3, 3), activation='relu', padding='same')(inputs)
-    x = layers.BatchNormalization()(x)
-    x = layers.MaxPooling2D((2, 2))(x)
-    x = layers.Dropout(0.25)(x)
+    # EfficientNet base
+    x = base_model(inputs, training=False)
     
-    # Block 2
-    x = layers.Conv2D(64, (3, 3), activation='relu', padding='same')(x)
-    x = layers.BatchNormalization()(x)
-    x = layers.MaxPooling2D((2, 2))(x)
-    x = layers.Dropout(0.25)(x)
-    
-    # Block 3
-    x = layers.Conv2D(128, (3, 3), activation='relu', padding='same')(x)
-    x = layers.BatchNormalization()(x)
-    x = layers.MaxPooling2D((2, 2))(x)
-    x = layers.Dropout(0.25)(x)
-    
-    # Block 4
-    x = layers.Conv2D(256, (3, 3), activation='relu', padding='same')(x)
-    x = layers.BatchNormalization()(x)
-    x = layers.GlobalAveragePooling2D()(x)
-    x = layers.Dropout(0.3)(x)
-    
-    # Simpler dense layers (easier to learn simple patterns)
-    x = layers.Dense(256, activation='relu')(x)
+    # Classification head (dropout to prevent overfitting)
+    x = layers.Dropout(0.4)(x)
+    x = layers.Dense(512, activation='relu', kernel_regularizer=keras.regularizers.l2(0.001))(x)
     x = layers.BatchNormalization()(x)
     x = layers.Dropout(0.3)(x)
     
-    x = layers.Dense(128, activation='relu')(x)
+    x = layers.Dense(256, activation='relu', kernel_regularizer=keras.regularizers.l2(0.001))(x)
+    x = layers.BatchNormalization()(x)
     x = layers.Dropout(0.2)(x)
-    # Output
-    outputs = layers.Dense(num_classes, activation='softmax', dtype='float32')(x)
     
-    model = models.Model(inputs, outputs, name='DR_CustomCNN')
+    # Output layer
+    outputs = layers.Dense(num_classes, activation='softmax', dtype='float32', name='predictions')(x)
     
-    # Return model and None for base_model (to maintain compatibility)
-    return model, None
-
+    # Create model
+    model = models.Model(inputs, outputs, name='DR_EfficientNetB3')
+    
+    print(f"✅ EfficientNetB3 model created: {model.count_params():,} parameters")
+    print(f"   Base model: {base_model.count_params():,} parameters")
+    print(f"   Trainable: {sum([keras.backend.count_params(w) for w in model.trainable_weights]):,} parameters")
+    
+    return model, base_model
 
 def compile_model(model, learning_rate=None, use_focal_loss=False):
     """Compile model with optimizer and metrics."""

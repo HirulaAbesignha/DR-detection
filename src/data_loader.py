@@ -52,11 +52,30 @@ def load_dataset(data_path=None, sample_size=None):
         
         # First pass: collect all samples by class
         print("Organizing samples by class...")
+
         for i, sample in enumerate(dataset):
             label = int(sample['label'])
             if label in samples_by_class:
+                # Get image from HuggingFace (PIL Image)
+                img = sample['image']
+                
+                # Convert PIL to RGB if needed
+                if hasattr(img, 'mode') and img.mode != 'RGB':
+                    img = img.convert('RGB')
+                
+                # Convert to numpy array
+                img_array = np.array(img)
+                
+                # Verify shape (ensure 3 channels)
+                if len(img_array.shape) != 3 or img_array.shape[2] != 3:
+                    print(f"Warning: Image {i} has shape {img_array.shape}, converting to RGB...")
+                    if len(img_array.shape) == 2:
+                        img_array = cv2.cvtColor(img_array, cv2.COLOR_GRAY2RGB)
+                    elif img_array.shape[2] == 1:
+                        img_array = np.repeat(img_array, 3, axis=2)
+                
                 samples_by_class[label].append({
-                    'image': np.array(sample['image']),
+                    'image': img_array,
                     'label': label,
                     'id': f'hf_{i}'
                 })
@@ -70,6 +89,14 @@ def load_dataset(data_path=None, sample_size=None):
         print(f"\nFull dataset distribution:")
         for cls in range(5):
             print(f"  Class {cls}: {len(samples_by_class[cls])} images")
+
+        if len(samples_by_class[0]) > 0:
+            first_img = samples_by_class[0][0]['image']
+            print(f"\n🔍 DEBUG: First image check:")
+            print(f"   Shape: {first_img.shape}")
+            print(f"   Dtype: {first_img.dtype}")
+            print(f"   Min: {first_img.min()}, Max: {first_img.max()}")
+            print(f"   Channels: {first_img.shape[2] if len(first_img.shape) == 3 else 'N/A'}")
         
         # Sample from each class proportionally
         samples = []
@@ -277,11 +304,63 @@ class DRDataGenerator(keras.utils.Sequence):
                 # Preprocessing first
                 img = preprocess_image(img)
                 
-                # Augmentation after preprocessing (more effective)
+                # Strong augmentation for better generalization
                 if self.augment:
-                    # Apply augmentation to preprocessed image
+                    # Horizontal flip (50% chance)
                     if np.random.random() < 0.5:
-                        img = np.fliplr(img)  # Flip horizontally
+                        img = np.fliplr(img)
+                    
+                    # Vertical flip (50% chance) - retinal images can be rotated
+                    if np.random.random() < 0.5:
+                        img = np.flipud(img)
+                    
+                    # Random rotation (30% chance, -15 to +15 degrees)
+                    if np.random.random() < 0.3:
+                        angle = np.random.uniform(-15, 15)
+                        h, w = img.shape[:2]
+                        center = (w // 2, h // 2)
+                        M = cv2.getRotationMatrix2D(center, angle, 1.0)
+                        
+                        # Use reflect padding to avoid black borders
+                        img_temp = (img * np.array([0.229, 0.224, 0.225]) + np.array([0.485, 0.456, 0.406])) * 255.0
+                        img_temp = np.clip(img_temp, 0, 255).astype(np.uint8)
+                        img_temp = cv2.warpAffine(img_temp, M, (w, h), borderMode=cv2.BORDER_REFLECT)
+                        
+                        # Re-normalize
+                        img = img_temp.astype(np.float32) / 255.0
+                        img = (img - np.array([0.485, 0.456, 0.406])) / np.array([0.229, 0.224, 0.225])
+                    
+                    # Brightness adjustment (30% chance)
+                    if np.random.random() < 0.3:
+                        factor = np.random.uniform(0.85, 1.15)
+                        img = np.clip(img * factor, -3.0, 3.0)
+                    
+                    # Random zoom (20% chance, 0.9x to 1.1x)
+                    if np.random.random() < 0.2:
+                        zoom = np.random.uniform(0.9, 1.1)
+                        h, w = img.shape[:2]
+                        new_h, new_w = int(h * zoom), int(w * zoom)
+                        
+                        img_temp = (img * np.array([0.229, 0.224, 0.225]) + np.array([0.485, 0.456, 0.406])) * 255.0
+                        img_temp = np.clip(img_temp, 0, 255).astype(np.uint8)
+                        img_temp = cv2.resize(img_temp, (new_w, new_h))
+                        
+                        # Center crop/pad to original size
+                        if zoom > 1:
+                            # Crop
+                            start_h = (new_h - h) // 2
+                            start_w = (new_w - w) // 2
+                            img_temp = img_temp[start_h:start_h+h, start_w:start_w+w]
+                        else:
+                            # Pad
+                            pad_h = (h - new_h) // 2
+                            pad_w = (w - new_w) // 2
+                            img_temp = cv2.copyMakeBorder(img_temp, pad_h, h-new_h-pad_h, 
+                                                         pad_w, w-new_w-pad_w, cv2.BORDER_REFLECT)
+                        
+                        # Re-normalize
+                        img = img_temp.astype(np.float32) / 255.0
+                        img = (img - np.array([0.485, 0.456, 0.406])) / np.array([0.229, 0.224, 0.225])
                 
                 X[i] = img
                 y[i, label] = 1.0

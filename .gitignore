@@ -27,10 +27,6 @@ models/*.h5
 models/*.pb
 
 # Outputs
-outputs/plots/*.png
-outputs/logs/*.csv
-temp_gradio_plot.png
-
 # Cache
 cache/
 .cache/

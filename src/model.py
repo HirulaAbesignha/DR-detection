@@ -10,51 +10,53 @@ from .utils import CONFIG
 
 
 def create_dr_model(num_classes=5, input_shape=None):
-    """Create EfficientNetB3 model with transfer learning for DR detection."""
+    """Create DenseNet121 model with transfer learning for DR detection."""
     if input_shape is None:
         input_shape = (CONFIG['IMG_SIZE'], CONFIG['IMG_SIZE'], 3)
     
-    # Use EfficientNetB3 pretrained on ImageNet
-    print("Loading EfficientNetB3 with ImageNet weights...")
-    base_model = keras.applications.EfficientNetB3(
+    # Use DenseNet121 pretrained on ImageNet
+    print("Loading DenseNet121 with ImageNet weights...")
+    base_model = keras.applications.DenseNet121(
         include_top=False,
-        weights='imagenet',  # CRITICAL: Pretrained weights
+        weights='imagenet',
         input_shape=input_shape,
         pooling='avg'
     )
     
-    # Freeze base model initially (will unfreeze later for fine-tuning)
+    # Freeze base model initially
     base_model.trainable = False
     print(f"Base model frozen: {len(base_model.layers)} layers")
     
     # Build full model
     inputs = layers.Input(shape=input_shape, name='input_image')
     
-    # EfficientNet base
+    # DenseNet base
     x = base_model(inputs, training=False)
     
-    # Classification head (dropout to prevent overfitting)
+    # Classification head - improved capacity
+    x = layers.Dropout(0.5)(x)
+    x = layers.Dense(512, activation='relu', kernel_regularizer=keras.regularizers.l2(0.01))(x)
+    x = layers.BatchNormalization()(x)
     x = layers.Dropout(0.4)(x)
-    x = layers.Dense(512, activation='relu', kernel_regularizer=keras.regularizers.l2(0.001))(x)
+
+    x = layers.Dense(256, activation='relu', kernel_regularizer=keras.regularizers.l2(0.01))(x)
     x = layers.BatchNormalization()(x)
     x = layers.Dropout(0.3)(x)
-    
-    x = layers.Dense(256, activation='relu', kernel_regularizer=keras.regularizers.l2(0.001))(x)
-    x = layers.BatchNormalization()(x)
+
+    x = layers.Dense(128, activation='relu')(x)
     x = layers.Dropout(0.2)(x)
-    
+
     # Output layer
     outputs = layers.Dense(num_classes, activation='softmax', dtype='float32', name='predictions')(x)
     
     # Create model
-    model = models.Model(inputs, outputs, name='DR_EfficientNetB3')
+    model = models.Model(inputs, outputs, name='DR_DenseNet121')
     
-    print(f"✅ EfficientNetB3 model created: {model.count_params():,} parameters")
+    print(f"✅ DenseNet121 model created: {model.count_params():,} parameters")
     print(f"   Base model: {base_model.count_params():,} parameters")
     print(f"   Trainable: {sum([keras.backend.count_params(w) for w in model.trainable_weights]):,} parameters")
     
     return model, base_model
-
 def compile_model(model, learning_rate=None, use_focal_loss=False):
     """Compile model with optimizer and metrics."""
     if learning_rate is None:

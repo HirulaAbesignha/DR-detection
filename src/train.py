@@ -37,36 +37,33 @@ from .visualization import plot_confusion_matrix, plot_roc_curves
 
 
 def get_callbacks(model_save_path, patience=None):
-    """Get training callbacks."""
+    """Get training callbacks with better patience."""
     if patience is None:
         patience = CONFIG['PATIENCE']
     
     callbacks_list = [
         keras.callbacks.ModelCheckpoint(
             model_save_path,
-            monitor='val_accuracy',
+            monitor='val_accuracy',  # Monitor accuracy, not loss
             save_best_only=True,
             mode='max',
             verbose=1
         ),
         keras.callbacks.EarlyStopping(
-            monitor='val_loss',
+            monitor='val_accuracy',  # CHANGED: Monitor accuracy instead of loss
             patience=patience,
+            mode='max',  # ADDED: Look for maximum accuracy
             restore_best_weights=True,
             verbose=1
         ),
         keras.callbacks.ReduceLROnPlateau(
-            monitor='val_loss',
+            monitor='val_accuracy',  # CHANGED: Monitor accuracy
             factor=0.5,
-            patience=patience // 2,
+            patience=7,  # CHANGED: Fixed patience (not dependent on main patience)
             min_lr=1e-7,
+            mode='max',  # ADDED: Look for maximum accuracy
             verbose=1
         ),
-        keras.callbacks.CSVLogger(
-            'outputs/logs/training_log.csv',
-            append=False
-        ),
-        keras.callbacks.TerminateOnNaN()
     ]
     
     return callbacks_list
@@ -78,6 +75,14 @@ def train_model(data_path=None, epochs=None, batch_size=None, learning_rate=None
     print("="*70)
     print("DIABETIC RETINOPATHY DETECTION - TRAINING PIPELINE")
     print("="*70)
+
+    #Delete old model
+    import os
+    model_path = CONFIG['MODEL_SAVE_PATH']
+    if os.path.exists(model_path):
+        print(f"Deleting old model: {model_path}")
+        os.remove(model_path)
+        print("Old model deleted - starting fresh!")
     
     print_system_info()
     setup_gpu()
@@ -93,6 +98,8 @@ def train_model(data_path=None, epochs=None, batch_size=None, learning_rate=None
     
     # Load dataset
     print("\n[1/8] Loading dataset...")
+    if data_path is None:
+        data_path = './data/aptos2019/organized'  # Use APTOS by default
     samples = load_dataset(data_path=data_path, sample_size=CONFIG['SAMPLE_SIZE'])
     print(f"✓ Loaded {len(samples)} samples")
     
@@ -104,7 +111,9 @@ def train_model(data_path=None, epochs=None, batch_size=None, learning_rate=None
     # ALWAYS balance dataset for severely imbalanced data
     print("\n⚠ Balancing dataset to ensure all classes are represented...")
     from .data_loader import balance_dataset
-    samples = balance_dataset(samples, max_samples_per_class=2000)
+    # Don't undersample majority class too much
+    #samples = balance_dataset(samples, max_samples_per_class=4000)
+    print("✅ Using full APTOS dataset without artificial balancing")
     
     # Analyze balanced dataset
     stats = analyze_dataset(samples)
@@ -174,11 +183,11 @@ def train_model(data_path=None, epochs=None, batch_size=None, learning_rate=None
     model = compile_model(model, learning_rate=CONFIG['LEARNING_RATE'], use_focal_loss=False)
     print("✓ Using standard categorical cross-entropy loss")
 
-    # Use focal loss for imbalanced data
+    # Use standard categorical crossentropy (simpler, more stable)
     optimizer = keras.optimizers.Adam(learning_rate=CONFIG['LEARNING_RATE'])
     model.compile(
         optimizer=optimizer,
-        loss=focal_loss(gamma=2.0, alpha=0.25),
+        loss='categorical_crossentropy',
         metrics=[
             'accuracy',
             keras.metrics.AUC(name='auc'),
@@ -208,28 +217,28 @@ def train_model(data_path=None, epochs=None, batch_size=None, learning_rate=None
     )
     memory_cleanup()
 
-    # Training Stage 2: Fine-tuning (unfreeze base model)
+    # Training Stage 2: Fine-tuning
     if base_model is not None:
         print("\n[6/8] Training Stage 2 - Fine-tuning base model...")
         
         # Unfreeze base model
         base_model.trainable = True
         
-        # Freeze first 100 layers (keep low-level features)
-        for layer in base_model.layers[:100]:
+        # Freeze first 300 layers (adjust based on your model)
+        for layer in base_model.layers[:300]:
             layer.trainable = False
         
         trainable_layers = sum([1 for layer in base_model.layers if layer.trainable])
         print(f"✅ Unfrozen {trainable_layers} layers for fine-tuning")
         
-        # Recompile with LOWER learning rate (critical for fine-tuning)
+        # Recompile with lower learning rate
         fine_tune_lr = CONFIG['LEARNING_RATE'] / 10
         print(f"Using fine-tuning learning rate: {fine_tune_lr}")
         
         optimizer = keras.optimizers.Adam(learning_rate=fine_tune_lr)
         model.compile(
             optimizer=optimizer,
-            loss=focal_loss(gamma=2.0, alpha=0.25),
+            loss='categorical_crossentropy',
             metrics=[
                 'accuracy',
                 keras.metrics.AUC(name='auc'),
@@ -238,24 +247,37 @@ def train_model(data_path=None, epochs=None, batch_size=None, learning_rate=None
             ]
         )
         
-        # Reset callbacks for stage 2
-        callbacks_list = get_callbacks(CONFIG['MODEL_SAVE_PATH'], patience=CONFIG['PATIENCE'])
+        # NEW callbacks for stage 2
+        callbacks_stage2 = [
+            keras.callbacks.ModelCheckpoint(
+                CONFIG['MODEL_SAVE_PATH'],
+                monitor='val_accuracy',
+                save_best_only=True,
+                mode='max',
+                verbose=1
+            ),
+            keras.callbacks.ReduceLROnPlateau(
+                monitor='val_accuracy',
+                factor=0.5,
+                patience=5,
+                min_lr=1e-7,
+                mode='max',
+                verbose=1
+            )
+        ]
         
-        # Fine-tune for fewer epochs
-        fine_tune_epochs = 20
-        print(f"Fine-tuning for {fine_tune_epochs} epochs...")
-        
+        # ACTUALLY TRAIN (this was missing!)
+        print(f"Fine-tuning for 35 epochs...")
         history2 = model.fit(
             train_gen,
             validation_data=val_gen,
-            epochs=fine_tune_epochs,
-            callbacks=callbacks_list,
+            epochs=35,  # More epochs for fine-tuning
+            callbacks=callbacks_stage2,
             class_weight=class_weights,
-            verbose=1,
-            initial_epoch=len(history1.history['loss'])
+            verbose=1
         )
         
-        # Combine training histories
+        # Combine histories
         print("Merging training histories...")
         for key in history1.history:
             if key in history2.history:
@@ -263,9 +285,9 @@ def train_model(data_path=None, epochs=None, batch_size=None, learning_rate=None
         
         print("✅ Fine-tuning complete!")
     else:
-        print("\n[6/8] Skipping fine-tuning (no base model available)")
+        print("\n[6/8] Skipping fine-tuning (no base model)")
         history2 = None
-    
+
     memory_cleanup()
     
     # Plot training history

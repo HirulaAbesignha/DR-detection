@@ -301,43 +301,35 @@ class DRDataGenerator(keras.utils.Sequence):
                 if img.shape[:2] != (CONFIG['IMG_SIZE'], CONFIG['IMG_SIZE']):
                     img = cv2.resize(img, (CONFIG['IMG_SIZE'], CONFIG['IMG_SIZE']))
                 
-                # Preprocessing first
-                img = preprocess_image(img)
-                
-                # Strong augmentation for better generalization
                 if self.augment:
-                    # Horizontal flip (50% chance)
-                    if np.random.random() < 0.5:
+                # MORE aggressive augmentation for better generalization
+                
+                    # Horizontal flip (70% chance instead of 50%)
+                    if np.random.random() < 0.7:
                         img = np.fliplr(img)
                     
-                    # Vertical flip (50% chance) - retinal images can be rotated
-                    if np.random.random() < 0.5:
+                    # Vertical flip (70% chance)
+                    if np.random.random() < 0.7:
                         img = np.flipud(img)
                     
-                    # Random rotation (30% chance, -15 to +15 degrees)
-                    if np.random.random() < 0.3:
-                        angle = np.random.uniform(-15, 15)
+                    # Rotation (50% chance, -20 to +20 degrees)
+                    if np.random.random() < 0.5:
+                        angle = np.random.uniform(-20, 20)
                         h, w = img.shape[:2]
                         center = (w // 2, h // 2)
                         M = cv2.getRotationMatrix2D(center, angle, 1.0)
                         
-                        # Use reflect padding to avoid black borders
+                        # Denormalize, rotate, renormalize
                         img_temp = (img * np.array([0.229, 0.224, 0.225]) + np.array([0.485, 0.456, 0.406])) * 255.0
                         img_temp = np.clip(img_temp, 0, 255).astype(np.uint8)
                         img_temp = cv2.warpAffine(img_temp, M, (w, h), borderMode=cv2.BORDER_REFLECT)
                         
-                        # Re-normalize
                         img = img_temp.astype(np.float32) / 255.0
                         img = (img - np.array([0.485, 0.456, 0.406])) / np.array([0.229, 0.224, 0.225])
                     
-                    # Brightness adjustment (30% chance)
+                    # Zoom (30% chance)
                     if np.random.random() < 0.3:
-                        factor = np.random.uniform(0.85, 1.15)
-                        img = np.clip(img * factor, -3.0, 3.0)
-                    
-                    # Random zoom (20% chance, 0.9x to 1.1x)
-                    if np.random.random() < 0.2:
-                        zoom = np.random.uniform(0.9, 1.1)
+                        zoom = np.random.uniform(0.85, 1.15)
                         h, w = img.shape[:2]
                         new_h, new_w = int(h * zoom), int(w * zoom)
                         
@@ -345,22 +337,25 @@ class DRDataGenerator(keras.utils.Sequence):
                         img_temp = np.clip(img_temp, 0, 255).astype(np.uint8)
                         img_temp = cv2.resize(img_temp, (new_w, new_h))
                         
-                        # Center crop/pad to original size
                         if zoom > 1:
-                            # Crop
-                            start_h = (new_h - h) // 2
-                            start_w = (new_w - w) // 2
+                            start_h, start_w = (new_h - h) // 2, (new_w - w) // 2
                             img_temp = img_temp[start_h:start_h+h, start_w:start_w+w]
                         else:
-                            # Pad
-                            pad_h = (h - new_h) // 2
-                            pad_w = (w - new_w) // 2
+                            pad_h, pad_w = (h - new_h) // 2, (w - new_w) // 2
                             img_temp = cv2.copyMakeBorder(img_temp, pad_h, h-new_h-pad_h, 
-                                                         pad_w, w-new_w-pad_w, cv2.BORDER_REFLECT)
+                                                        pad_w, w-new_w-pad_w, cv2.BORDER_REFLECT)
                         
-                        # Re-normalize
                         img = img_temp.astype(np.float32) / 255.0
                         img = (img - np.array([0.485, 0.456, 0.406])) / np.array([0.229, 0.224, 0.225])
+                    
+                    # Brightness/Contrast (40% chance)
+                    if np.random.random() < 0.4:
+                        brightness = np.random.uniform(0.8, 1.2)
+                        contrast = np.random.uniform(0.9, 1.1)
+                        img = img * contrast + (brightness - 1.0) * 0.5
+                        img = np.clip(img, -3.0, 3.0)
+                # Preprocessing first
+                img = preprocess_image(img)
                 
                 X[i] = img
                 y[i, label] = 1.0
@@ -378,25 +373,23 @@ class DRDataGenerator(keras.utils.Sequence):
 
 
 def calculate_class_weights(samples):
-    """Calculate class weights for imbalanced dataset with stronger correction."""
-    labels = [int(s['label']) for s in samples]
-    class_counts = Counter(labels)
+    """Calculate balanced class weights using sklearn's proven method."""
+    from sklearn.utils.class_weight import compute_class_weight
+    import numpy as np
     
-    total = len(labels)
-    num_classes = 5
+    labels = np.array([int(s['label']) for s in samples])
     
-    # Calculate base weights
-    class_weights = {}
-    for cls in range(num_classes):
-        count = class_counts.get(cls, 1)
-        # Use square root to make weights more aggressive for minority classes
-        class_weights[cls] = (total / (num_classes * count)) ** 1.5
+    # Use sklearn's balanced class weights (industry standard)
+    class_weights_array = compute_class_weight(
+        class_weight='balanced',
+        classes=np.unique(labels),
+        y=labels
+    )
     
-    # Further boost minority classes (3 and 4)
-    class_weights[3] = class_weights[3] * 3.0  # Severe
-    class_weights[4] = class_weights[4] * 3.0  # Proliferative
+    # Convert to dictionary format
+    class_weights = {i: float(weight) for i, weight in enumerate(class_weights_array)}
     
-    print(f"Adjusted class weights: {class_weights}")
+    print(f"Balanced class weights (sklearn): {class_weights}")
     
     return class_weights
 

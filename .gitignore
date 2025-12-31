@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Data
+data/retinal_images/
+*.h5
+*.hdf5
+
+# Models
+models/*.h5
+models/*.pb
+
+# Outputs
+# Cache
+cache/
+.cache/
+
+# Logs
+*.log
+aptos2019/
+prediction_result.json
